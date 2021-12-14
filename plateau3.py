@@ -101,11 +101,11 @@ class Selector:
             self.VisitedSpriteMovementList_rect.clear()
 
         if self.SelectedSprite != None:
-            self.blit_spriteMovement_arrea()
+            self.blit_spriteMovement_arrea() # aie aie aie la fôte d'ortaugraf !
             self.collide_with_spriteMovementCase()
             self.draw_selector_case()
 
-    def change_SelectedSprite(self):
+    def change_SelectedSprite(self): # si un sprite est survolé (self.HoveredSprite), il devient selectionné (self.SelectedSprite), sinon rien
         if self.HoveredSprite != None and self.SelectedSprite == None:
             self.SelectedSprite = self.HoveredSprite
         else:
@@ -170,7 +170,7 @@ class Map:
         self.pictures = {}
         self.maps_rect = []
 
-        for filename in filenames:
+        for filename in filenames: # permet d'afficher plusieurs maps (pour avoir des backgrounds par exemple)
             map = self.load_map(filename)
             self.maps.append(map)
         self.load_pictures()
@@ -178,8 +178,6 @@ class Map:
 
     def load_map(self, filename):
         map_data = []
-        map_size = []
-        map = []
         with open(filename) as file:
             for line in file:
                 line = line.split("|")
@@ -188,10 +186,10 @@ class Map:
                     if character != '\n':
                         character_list.append(character)
                 map_data.append(character_list)
-        map_size = (len(map_data), len(map_data[0]))
+        self.map_size = (len(map_data[0]), len(map_data))
         return map_data
 
-    def load_pictures(self):
+    def load_pictures(self): # permet de charger les images dans le dic self.pictures à partir des correspondances contenues dans images.py
         for key, value in self.name_pictures.items():
             temp_img = pygame.image.load(self.img_path + value).convert_alpha()
             self.pictures[key] = pygame.transform.scale(temp_img, (self.sprite_width, self.sprite_height))
@@ -201,7 +199,7 @@ class Map:
         for key in self.pictures.keys():
             self.rect_dic[key] = list()
 
-    def create_rect(self):
+    def create_rect(self): # permet de créer un dic avec correspondance d'une liste de position de cette image: {'img1': [liste de positions], 'img2': [liste de position2]}
         for index, map in enumerate(self.maps):
             self.init_rectDictionnary()
             for y,row in enumerate(map):
