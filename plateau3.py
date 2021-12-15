@@ -1,5 +1,8 @@
 import pygame, sys
 import images, sprites_specificity
+import random
+from hashlib import sha256 as hashlib_sha256
+from os import path as os_path
 
 class tank:
     def __init__(self, screen, image, rect, specificity, name):
@@ -159,7 +162,7 @@ class Selector:
         for case in self.VisitedSpriteMovementList:
             pygame.draw.line(self.screen, self.WHITE, case.center, (case.centerx, case.centery), thickness)
 
-class Map:
+class Map: # comment differencier les maps qui "changent" des autres? -> on le fait pas :)
     def __init__(self, screen, sprite_width, sprite_height, name_pictures, filenames):
         self.screen = screen
         self.sprite_width = sprite_width
@@ -170,11 +173,28 @@ class Map:
         self.pictures = {}
         self.maps_rect = []
 
+        self.map_hash = ''
         for filename in filenames: # permet d'afficher plusieurs maps (pour avoir des backgrounds par exemple)
             map = self.load_map(filename)
             self.maps.append(map)
+            self.map_hash += self.hash_file(filename)
         self.load_pictures()
         self.create_rect()
+        self.base_map_image = self.create_map_image()
+
+    def hash_file(self, filename):
+        file = filename # Location of the file (can be set a different way)
+        BLOCK_SIZE = 65536 # The size of each read from the file
+
+        file_hash = hashlib_sha256() # Create the hash object, can use something other than `.sha256()` if you wish
+        with open(file, 'rb') as f: # Open the file to read it's bytes
+            fb = f.read(BLOCK_SIZE) # Read from the file. Take in the amount declared above
+            while len(fb) > 0: # While there is still data being read from the file
+                file_hash.update(fb) # Update the hash
+                fb = f.read(BLOCK_SIZE) # Read the next block from the file
+
+        #print (file_hash.hexdigest()) # Get the hexadecimal digest of the hash
+        return (file_hash.hexdigest())
 
     def load_map(self, filename):
         map_data = []
@@ -209,11 +229,35 @@ class Map:
             self.maps_rect.append(self.rect_dic)
 
     def blit_map(self):
+        self.screen.blit(self.base_map_image, (0,0))
+        """
         for map_rect in self.maps_rect:
             for key, wall_list in map_rect.items():
                 if len(wall_list) != 0:
                     for wall in wall_list:
                         self.screen.blit(self.pictures[key],wall)
+        """
+    
+    def create_map_image(self): # creates an image of all the maps contained in self.maps if thei image of the map is not existing. Else, it loads the map who already exists
+        if not os_path.isfile(f"{self.img_path}{self.map_hash}.png"):
+            default_image = pygame.Surface((self.sprite_width, self.sprite_height))
+            default_image.fill((0,0,255)) 
+            map_image = pygame.Surface((self.map_size[0]*self.sprite_width, self.map_size[1]*self.sprite_height))
+            for map in self.maps:
+                for y, map_elements in enumerate(map):
+                    for x, element in enumerate(map_elements):
+                        if element != '0':
+                            map_image.blit(self.pictures[element], (x*self.sprite_width, y*self.sprite_height))
+                        else:
+                            map_image.blit(default_image, (x*self.sprite_width, y*self.sprite_height))
+            pygame.image.save(map_image, f"{self.img_path}{self.map_hash}.png")
+            print(f"[+] saved new image called [{self.img_path}{self.map_hash}.png]")
+            return map_image
+        else:
+            map_image = pygame.image.load(f"{self.img_path}{self.map_hash}.png").convert()
+            map_image.set_colorkey((0,0,255))
+            print(f"[=] opened file \"{self.img_path}{self.map_hash}.png\"")
+            return map_image
 
 class Game:
     def __init__(self, screen_size, sprite_size, plateforms_images,sprite_images, tanks_specificity):
