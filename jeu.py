@@ -1,5 +1,3 @@
-#Changement nom "plateau3.py" -> "jeu.py"
-#Suppression des autres "plateau{X}.py"
 import pygame, sys
 import images, sprites_specificity
 import random
@@ -16,6 +14,10 @@ class tank:
 
     def blit(self):
         self.screen.blit(self.image, self.rect)
+    
+    def move(self, pos_x, pos_y):
+        self.rect.x = pos_x
+        self.rect.y = pos_y
 
     def informations(self):
         print(f"tank: {self.name} = {self.image}, {self.rect}, can shot to {self.FireDistance} and move to {self.MovementDistance}")
@@ -50,17 +52,22 @@ class Selector:
         self.screen = screen
         self.sprite_width, self.sprite_height = sprite_size
         self.screen_width, self.screen_height = screen_size
-
+        # Le curseur
         self.rect = pygame.Rect(0,0, self.sprite_width, self.sprite_height)
-        self.image = pygame.Surface((self.sprite_width, self.sprite_height))
-        self.image.set_alpha(140)
-        self.image.fill(self.YELLOW)
-
-        self.selected_image = pygame.Surface((self.sprite_width, self.sprite_height))
-        self.selected_image.set_alpha(140)
-        self.selected_image.fill(self.GREEN)
+        self.cursor = pygame.Surface((self.sprite_width, self.sprite_height))
+        self.cursor.set_alpha(140) # pour la transparence
+        self.cursor.fill(self.YELLOW)
+        # l'image qui permet de représenter les cases sur lesquelles le véhicule peut se déplacer
+        self.image_movement_cases = pygame.Surface((self.sprite_width, self.sprite_height))
+        self.image_movement_cases.set_alpha(140)
+        self.image_movement_cases.fill(self.GREEN)
+        # l'image qui permet de représenter les cases sur lesquelles le véhicule peut tirer
+        self.image_fire_case = pygame.Surface((self.sprite_width, self.sprite_height))
+        self.image_fire_case.set_alpha(140)
+        self.image_fire_case.fill(self.RED)
 
         self.sprite_list = []
+        self.sprite_list_rect = []
         self.SpriteMovementCaseList = []
         self.VisitedSpriteMovementList = []
         self.VisitedSpriteMovementList_rect = []
@@ -77,16 +84,27 @@ class Selector:
         self.vy = (event[pygame.K_DOWN]-event[pygame.K_UP])*self.sprite_height
 
         self.check_if_not_exceed_screen()
-        if self.collide_with_sprite():
-            self.image.set_alpha(200)
-            self.image.fill(self.WHITE)
-        else:
-            self.image.set_alpha(140)
-            self.image.fill(self.YELLOW)
+        if self.collide_with_sprite(): # si on survol un véhicule, on change la transparence et la couleur du curseur
+            # la fonction self.collide_with_sprite() permet de stocker le véhicule survolé dans la variable self.HoveredSprite
+            self.cursor.set_alpha(200)
+            self.cursor.fill(self.WHITE)
+        else:                           # sinon, on (re)met le curseur "à la normale"
+            self.cursor.set_alpha(140)
+            self.cursor.fill(self.YELLOW)
+        
+        self.try_move_the_sprite(event)
 
-        self.check_if_sprite_select()
-        self.rect.x += self.vx
+        self.check_if_sprite_select() # permet de réagir si on appuye sur "Entrée" alors que la variable self.HoveredSprite contient un véhicule
+        self.rect.x += self.vx # on fait avancer le curseur
         self.rect.y += self.vy
+
+    def try_move_the_sprite(self, event):
+        if event[pygame.K_RETURN] and self.SelectedSprite != None:
+            for case in self.SpriteMovementCaseList: # on regarde toutes les cases
+                if self.rect.colliderect(case) and case not in self.sprite_list_rect: # si une de ces cases entre en collision avec le curseur, on bouge le véhicule à ces coordonnées
+                    #print(f"Curseur: ({self.rect.x};{self.rect.y}) || Sprite: ({self.SelectedSprite.rect.x};{self.SelectedSprite.rect.y})")
+                    self.SelectedSprite.move(self.rect.x, self.rect.y)
+                    return
 
     def check_if_not_exceed_screen(self):
         if ((self.rect.x + self.vx) >= self.screen_width) or ((self.rect.x + self.vx) < 0):
@@ -96,19 +114,23 @@ class Selector:
 
     def update_sprite_list(self, list):
         self.sprite_list = list
+        for sprite in list:
+            self.sprite_list_rect.append(sprite.rect)
+
 
     def check_if_sprite_select(self):
         pygame.event.pump()
         event = pygame.key.get_pressed()
-        if event[pygame.K_RETURN]:
-            self.change_SelectedSprite()
-            self.VisitedSpriteMovementList.clear()
+        if event[pygame.K_RETURN]: # si on appuye sur "Entrée"
+            self.change_SelectedSprite() # enregistre dans self.SelectedSprite le véhicule qui est selectionné (survolé + touche "Entrée")
+            self.VisitedSpriteMovementList.clear() # on vide les listes en vue de les ré-utiliser
             self.VisitedSpriteMovementList_rect.clear()
 
-        if self.SelectedSprite != None:
-            self.blit_spriteMovement_arrea() # aie aie aie la fôte d'ortaugraf !
-            self.collide_with_spriteMovementCase()
-            self.draw_selector_case()
+        if self.SelectedSprite != None: # si un véhicule est selectionné ||| Contraire = par ex si on appuye sur "Entrée" alors que l'on ne se situe pas sur un véhicule)
+            # on affiche les cases de déplacement possible du véhicule (ligne en-dessous)
+            self.blit_area(self.SelectedSprite.MovementDistance, self.image_movement_cases, self.SpriteMovementCaseList, self.SelectedSprite.rect.x, self.SelectedSprite.rect.y)
+            self.collide_with_spriteMovementCase() # on change la couleur du curseur si il est situé dans une des cases de déplacement
+            #self.draw_selector_case() # PAS TERMINE :: permet d'afficher le chemin parcouru
 
     def change_SelectedSprite(self): # si un sprite est survolé (self.HoveredSprite), il devient selectionné (self.SelectedSprite), sinon rien
         if self.HoveredSprite != None and self.SelectedSprite == None:
@@ -117,47 +139,37 @@ class Selector:
             self.SelectedSprite = None
 
     def collide_with_sprite(self):
-        for sprite in self.sprite_list:
+        for sprite in self.sprite_list: # sprite est de type "class tank"
             if self.rect.colliderect(sprite):
-                self.HoveredSprite = sprite
+                self.HoveredSprite = sprite # on enregistre quel véhicule on a survolé
                 return True
-        self.HoveredSprite = None
+        self.HoveredSprite = None # sinon on supprime le véhicule anciennement "enregistré" dans cette variable
         return False
 
     def collide_with_spriteMovementCase(self):
         for sprite in self.SpriteMovementCaseList:
             if self.rect.colliderect(sprite):
-                self.image.set_alpha(200)
-                self.image.fill(self.RED)
+                self.cursor.set_alpha(200)
+                self.cursor.fill(self.RED)
                 if sprite not in self.VisitedSpriteMovementList:
                     self.VisitedSpriteMovementList.append(sprite)
                     self.VisitedSpriteMovementList_rect.append(self.rect)
                     #print(self.VisitedSpriteMovementList_rect)
 
-    def get_movement_on_sprite_arrea(self):
-        pass
-
     def blit(self):
-        self.screen.blit(self.image, self.rect)
-
-    def blit_spriteMovement_arrea(self):
-        self.SpriteMovementCaseList.clear()
-        for i in range(self.SelectedSprite.MovementDistance):
-            new_posx1 = pygame.Rect(self.SelectedSprite.rect.x + i*self.sprite_width, self.SelectedSprite.rect.y, self.sprite_width, self.sprite_height)
-            new_posx2 = pygame.Rect(self.SelectedSprite.rect.x - i*self.sprite_width, self.SelectedSprite.rect.y, self.sprite_width, self.sprite_height)
-
-            new_posy1 = pygame.Rect(self.SelectedSprite.rect.x, self.SelectedSprite.rect.y + i*self.sprite_height, self.sprite_width, self.sprite_height)
-            new_posy2 = pygame.Rect(self.SelectedSprite.rect.x, self.SelectedSprite.rect.y - i*self.sprite_height, self.sprite_width, self.sprite_height)
-
-            self.screen.blit(self.selected_image, new_posx1)
-            self.screen.blit(self.selected_image, new_posx2)
-            self.screen.blit(self.selected_image, new_posy1)
-            self.screen.blit(self.selected_image, new_posy2)
-
-            self.SpriteMovementCaseList.append(new_posx1)
-            self.SpriteMovementCaseList.append(new_posx2)
-            self.SpriteMovementCaseList.append(new_posy1)
-            self.SpriteMovementCaseList.append(new_posy2)
+        self.screen.blit(self.cursor, self.rect)
+    
+    def blit_cases(self, case_liste, image):
+        for case_rect in case_liste:
+            self.screen.blit(image, case_rect)
+        
+    def blit_area(self, area_size, image_to_use, area_rect_list, origine_pos_x, origine_pos_y):
+        area_rect_list.clear()
+        for x in range(-area_size, area_size+1):
+            for y in range(-area_size, area_size+1):
+                if abs(x) + abs(y) <= area_size:
+                    area_rect_list.append(pygame.Rect(origine_pos_x + x*self.sprite_width, origine_pos_y + y*self.sprite_height, self.sprite_width, self.sprite_height))
+        self.blit_cases(area_rect_list, image_to_use)
 
     def draw_selector_case(self):
         thickness = 5
